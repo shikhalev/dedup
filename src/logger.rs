@@ -1,23 +1,17 @@
-use crate::opts::{Verbose, OPTS};
+use crate::{
+  echo::{echo, Level},
+  options::{ErrorMode, Verbose, OPTS},
+};
 use chrono::Local;
 use clap::lazy_static::lazy_static;
 use shellexpand;
 use std::{
   fs::{File, OpenOptions},
-  io::{self, Write},
+  io::Write,
   path::PathBuf,
   str::FromStr,
   sync::Mutex,
-  write,
 };
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum Level {
-  Error,
-  Change,
-  File,
-}
 
 struct Logger {
   file: Option<File>,
@@ -42,23 +36,23 @@ impl Logger {
               match oo.open(path) {
                 Ok(f) => Some(f),
                 Err(e) => {
-                  Self::echo(Level::Error, &e.to_string());
+                  echo(Level::Error, &e.to_string());
                   None
                 }
               }
             }
             Err(e) => {
-              Self::echo(Level::Error, &e.to_string());
+              echo(Level::Error, &e.to_string());
               None
             }
           },
           Err(e) => {
-            Self::echo(Level::Error, &e.to_string());
+            echo(Level::Error, &e.to_string());
             None
           }
         },
         None => {
-          Self::echo(Level::Error, "Invalid symbols in logfile path!");
+          echo(Level::Error, "Invalid symbols in logfile path!");
           None
         }
       }
@@ -81,11 +75,15 @@ impl Logger {
     {
       self.save(level, msg);
     }
-    if OPTS.verbose == Verbose::All
-      || OPTS.verbose == Verbose::Actions && level <= Level::Change
-      || OPTS.verbose == Verbose::Errors && level <= Level::Error
+    if OPTS.on_error != ErrorMode::Ignore
+      && (OPTS.verbose == Verbose::All
+        || OPTS.verbose == Verbose::Actions && level <= Level::Change
+        || OPTS.verbose == Verbose::Errors && level <= Level::Error)
     {
-      Self::echo(level, msg);
+      echo(level, msg);
+    }
+    if OPTS.on_error == ErrorMode::Abort && level == Level::Error {
+      panic!("Stop on Error");
     }
   }
 
@@ -99,31 +97,7 @@ impl Logger {
         msg
       )
       .unwrap(),
-      None => Logger::echo(Level::Error, "Illegal write!"),
-    }
-  }
-
-  fn color_echo(level: Level, msg: &str) -> io::Result<()> {
-    let mut out = StandardStream::stderr(OPTS.color_mode.into());
-    out.reset()?;
-    out.set_color(&*TIME_COLORSPEC)?;
-    write!(out, "[{}] ", Local::now().format("%H:%M:%S%.6f"))?;
-    out.set_color(level_spec(level))?;
-    write!(out, "[{:?}]", level)?;
-    out.reset()?;
-    writeln!(out, ": {}", msg)?;
-    Ok(())
-  }
-
-  fn echo(level: Level, msg: &str) {
-    match Self::color_echo(level, msg) {
-      Ok(_) => {}
-      Err(_) => eprintln!(
-        "[{}] [{:?}]: {}",
-        Local::now().format("%H:%M:%S%.6f"),
-        level,
-        msg
-      ),
+      None => echo(Level::Error, "Illegal write!"),
     }
   }
 }
@@ -151,26 +125,4 @@ pub fn change(msg: &str) {
 #[inline]
 pub fn file(msg: &str) {
   log(Level::File, msg)
-}
-
-fn fg_spec(color: Color) -> ColorSpec {
-  let mut r = ColorSpec::new();
-  r.set_fg(Some(color)).set_intense(true);
-  r
-}
-
-lazy_static! {
-  static ref TIME_COLORSPEC: ColorSpec = fg_spec(Color::Blue);
-  static ref ERROR_COLORSPEC: ColorSpec = fg_spec(Color::Red);
-  static ref CHANGE_COLORSPEC: ColorSpec = fg_spec(Color::Yellow);
-  static ref FILE_COLORSPEC: ColorSpec = fg_spec(Color::Cyan);
-}
-
-#[inline]
-fn level_spec(level: Level) -> &'static ColorSpec {
-  match level {
-    Level::Error => &*ERROR_COLORSPEC,
-    Level::Change => &*CHANGE_COLORSPEC,
-    Level::File => &*FILE_COLORSPEC,
-  }
 }

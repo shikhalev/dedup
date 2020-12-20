@@ -1,8 +1,9 @@
+mod echo;
 mod logger;
-mod opts;
+mod options;
 
 fn main() {
-  println!("\nfiles = {:?}", *opts::OPTS);
+  dbg!(&*options::OPTS);
   logger::error("TEST");
   let s: String = "Test String".to_string();
   dbg!(&s);
