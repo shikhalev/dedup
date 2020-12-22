@@ -1,15 +1,13 @@
 use crate::{
   echo::{echo, Level},
+  file::expand_path,
   options::{ErrorMode, Verbose, OPTS},
 };
 use chrono::Local;
 use clap::lazy_static::lazy_static;
-use shellexpand;
 use std::{
   fs::{File, OpenOptions},
   io::Write,
-  path::PathBuf,
-  str::FromStr,
   sync::Mutex,
 };
 
@@ -18,41 +16,27 @@ struct Logger {
 }
 
 impl Logger {
-  // TODO: Схлопнуть ошибки
-  // TODO: Убрать лишнее преобразование OsStr -> str -> OsStr
   #[inline]
   fn open_file() -> Option<File> {
     if OPTS.log_needed() {
-      match OPTS.log_path().to_str() {
-        Some(input_path) => match shellexpand::full(input_path) {
-          Ok(expanded_path) => match PathBuf::from_str(&expanded_path) {
-            Ok(path) => {
-              let mut oo = OpenOptions::new();
-              if path.exists() {
-                oo.write(true).append(true);
-              } else {
-                oo.write(true).create(true).create_new(true);
-              };
-              match oo.open(path) {
-                Ok(f) => Some(f),
-                Err(e) => {
-                  echo(Level::Error, &e.to_string());
-                  None
-                }
-              }
-            }
+      match expand_path(OPTS.log_path()) {
+        Ok(path) => {
+          let mut oo = OpenOptions::new();
+          if path.exists() {
+            oo.write(true).append(true);
+          } else {
+            oo.write(true).create(true).create_new(true);
+          };
+          match oo.open(path) {
+            Ok(f) => Some(f),
             Err(e) => {
               echo(Level::Error, &e.to_string());
               None
             }
-          },
-          Err(e) => {
-            echo(Level::Error, &e.to_string());
-            None
           }
-        },
-        None => {
-          echo(Level::Error, "Invalid symbols in logfile path!");
+        }
+        Err(e) => {
+          echo(Level::Error, &e.to_string());
           None
         }
       }

@@ -1,11 +1,23 @@
 mod echo;
+mod err;
+mod file;
 mod logger;
 mod options;
+mod process;
 
 fn main() {
   dbg!(&*options::OPTS);
-  logger::error("TEST");
-  let s: String = "Test String".to_string();
-  dbg!(&s);
-  logger::error(&s);
+  let a: String = "Jaha\nJaga!".to_string();
+  println!("a = {:?}", a);
+
+  if options::OPTS.paths.len() == 0 {
+    logger::error("No root paths specified!");
+  } else {
+    for path in &options::OPTS.paths {
+      match file::expand_path(path) {
+        Ok(p) => process::process_path(&p),
+        Err(e) => logger::error(&e.to_string()),
+      }
+    }
+  }
 }
