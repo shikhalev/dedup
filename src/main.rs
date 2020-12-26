@@ -6,10 +6,6 @@ mod options;
 mod process;
 
 fn main() {
-  dbg!(&*options::OPTS);
-  let a: String = "Jaha\nJaga!".to_string();
-  println!("a = {:?}", a);
-
   if options::OPTS.paths.len() == 0 {
     logger::error("No root paths specified!");
   } else {

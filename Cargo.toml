@@ -17,3 +17,8 @@ byte-unit = "*"
 termcolor = "*"
 shellexpand = "*"
 chrono = "*"
+
+[profile.release]
+opt-level = 3
+panic = "abort"
+lto = true

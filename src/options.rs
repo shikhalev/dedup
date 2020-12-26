@@ -42,6 +42,7 @@ pub enum SymlinkMode {
 pub enum ErrorMode {
   Ignore,
   Warning,
+  #[clap(visible_alias = "panic")]
   Abort,
 }
 
