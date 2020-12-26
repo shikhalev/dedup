@@ -17,6 +17,7 @@ byte-unit = "*"
 termcolor = "*"
 shellexpand = "*"
 chrono = "*"
+crc64fast = "*"
 
 [profile.release]
 opt-level = 3

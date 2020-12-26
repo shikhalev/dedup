@@ -6,6 +6,7 @@ mod options;
 mod process;
 
 fn main() {
+  dbg!(&*options::OPTS);
   if options::OPTS.paths.len() == 0 {
     logger::error("No root paths specified!");
   } else {

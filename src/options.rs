@@ -1,6 +1,9 @@
 use clap::{lazy_static::lazy_static, AppSettings, Clap, ValueHint};
+use std::os::linux::fs::MetadataExt;
 use std::{path::PathBuf, str::FromStr};
 use termcolor::ColorChoice;
+
+use crate::echo::{echo, Level};
 
 #[derive(Clone, Copy, Clap, Debug, PartialEq)]
 pub enum Verbose {
@@ -152,6 +155,13 @@ pub struct Opts {
   )]
   pub ignore_less: usize,
 
+  /// Buffer size for I/O operations.
+  ///
+  /// May be number or number with suffix such as B (byte),
+  /// KB (kilobyte = 1000B) or KiB (kibibyte = 1024B).
+  #[clap(short, long, parse(from_str = parse_bytes), default_value = "1MiB", value_name = "size")]
+  pub buffer_size: usize,
+
   /// Verbose level.
   ///
   /// `all` - show all checked files;
@@ -196,6 +206,9 @@ pub struct Opts {
   /// Files and directories for check and process.
   #[clap(value_name = "path", parse(from_os_str), value_hint = ValueHint::DirPath)]
   pub paths: Vec<PathBuf>,
+
+  #[clap(skip)]
+  pub primary_fs_dev: Option<u64>,
 }
 
 static DEFAULT_LOG_FILENAME: &'static str = "./dedup.log";
@@ -219,8 +232,32 @@ impl Opts {
       None => &*DEFAULT_LOG_PATH,
     }
   }
+
+  pub fn calculate() -> Self {
+    let mut result = Self::parse();
+    result.primary_fs_dev = if result.on_external_fs == ExternalFSMode::Group {
+      None
+    } else {
+      match &result.primary_fs {
+        Some(path) => match path.metadata() {
+          Ok(md) => Some(md.st_dev()),
+          Err(_) => {
+            // TODO: Более подробную ошибку
+            echo(Level::Error, "Invalid primary FS path!");
+            None
+          }
+        },
+        None => None,
+      }
+    };
+    result
+  }
+
+  pub fn check_dev(&self, dev: u64) -> bool {
+    self.primary_fs_dev == None || self.primary_fs_dev == Some(dev)
+  }
 }
 
 lazy_static! {
-  pub static ref OPTS: Opts = Opts::parse();
+  pub static ref OPTS: Opts = Opts::calculate();
 }
