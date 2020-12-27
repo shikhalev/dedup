@@ -1,9 +1,10 @@
 use crate::{
   logger,
-  options::{SymlinkMode, OPTS},
+  options::{ExternalFSMode, SymlinkMode, OPTS},
 };
 use clap::lazy_static::lazy_static;
 use crc64fast::Digest;
+use std::os::linux::fs::MetadataExt;
 use std::{
   collections::HashMap,
   fs,
@@ -12,7 +13,7 @@ use std::{
   sync::Mutex,
 };
 
-fn process_dir(path: &PathBuf, _: &fs::Metadata) {
+fn process_dir(path: &PathBuf) {
   logger::file(&path.to_string_lossy());
   match fs::read_dir(path) {
     Ok(rd) => {
@@ -59,14 +60,120 @@ fn file_crc64(path: &PathBuf) -> io::Result<u64> {
   Ok(digest.sum64())
 }
 
+fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
+  let mut f1 = fs::File::open(&first_path)?;
+  let mut f2 = fs::File::open(&second_path)?;
+  let mut b1 = Vec::<u8>::with_capacity(OPTS.buffer_size);
+  let mut b2 = Vec::<u8>::with_capacity(OPTS.buffer_size);
+  loop {
+    let l1 = f1.read(&mut b1)?;
+    let l2 = f2.read(&mut b2)?;
+    if l1 == 0 && l2 == 0 {
+      break;
+    }
+    if l1 != l2 || b1 != b2 {
+      return Ok(false);
+    }
+  }
+  Ok(true)
+}
+
 fn process_file(path: &PathBuf, md: &fs::Metadata) {
   logger::file(&path.to_string_lossy());
-  //
-  todo!();
+
+  let dev = md.st_dev();
+  let efs_m = OPTS.on_external_fs;
+  if efs_m == ExternalFSMode::Symlink {
+    todo!();
+  } else if efs_m == ExternalFSMode::Group {
+    // nothing to do
+  } else {
+    if !OPTS.check_dev(dev) {
+      if efs_m == ExternalFSMode::Error {
+        logger::error("Invalid FS!");
+      }
+      return;
+    }
+  }
+
+  let len = md.len();
+  let crc = match file_crc64(&path) {
+    Ok(r) => r,
+    Err(e) => {
+      logger::error(&e.to_string());
+      return;
+    }
+  };
+  let ino = md.st_ino();
+
+  let mut all_files = match FILES.lock() {
+    Ok(v) => v,
+    Err(e) => {
+      logger::error(&e.to_string());
+      return;
+    }
+  };
+  if !all_files.contains_key(&dev) {
+    all_files.insert(dev, HashMap::new());
+  }
+
+  let files_with_dev = match all_files.get_mut(&dev) {
+    Some(v) => v,
+    None => {
+      logger::error("Unknown error!!!");
+      return;
+    }
+  };
+  if !files_with_dev.contains_key(&len) {
+    files_with_dev.insert(len, HashMap::new());
+  }
+
+  let files_with_dev_and_len = match files_with_dev.get_mut(&len) {
+    Some(v) => v,
+    None => {
+      logger::error("Unknown error!!!");
+      return;
+    }
+  };
+  if !files_with_dev_and_len.contains_key(&crc) {
+    files_with_dev_and_len.insert(crc, HashMap::new());
+  }
+
+  let files_with_dev_and_len_and_crc = match files_with_dev_and_len.get(&crc) {
+      Some(v) => v,
+    None => {
+      logger::error("Unknown error!!!");
+      return;
+    }
+  };
+  if !files_with_dev_and_len_and_crc.contains_key(&ino) {
+    for (_, p) in files_with_dev_and_len_and_crc {
+      match file_equal(&p, &path) {
+          Ok(eq) => {
+            if eq {
+              logger::change(format!("{} => {}", path.to_string_lossy().as_ref(), p.to_string_lossy().as_ref()).as_str());
+              //;
+              // TODO: link
+              return;
+            }
+          }
+          Err(e) => logger::error(&e.to_string()),
+      }
+    }
+
+  let files_with_dev_and_len_and_crc = match files_with_dev_and_len.get_mut(&crc) {
+      Some(v) => v,
+    None => {
+      logger::error("Unknown error!!!");
+      return;
+    }
+  };
+    files_with_dev_and_len_and_crc.insert(ino, path.clone());
+  }
 }
 
 // TODO: Красиво логировать skip, dir и вообще...
-fn process_symlink(path: &PathBuf, _: &fs::Metadata) {
+fn process_symlink(path: &PathBuf) {
   logger::file(&path.to_string_lossy());
   match OPTS.on_symlink {
     SymlinkMode::Ignore => {}
@@ -83,9 +190,9 @@ pub fn process_path(path: &PathBuf) {
     Ok(md) => {
       let ft = md.file_type();
       if ft.is_symlink() {
-        process_symlink(&path, &md);
+        process_symlink(&path);
       } else if ft.is_dir() {
-        process_dir(&path, &md);
+        process_dir(&path);
       } else if ft.is_file() {
         process_file(&path, &md);
       }

@@ -1,6 +1,6 @@
 [package]
 name = "dedup"
-version = "0.8.0"
+version = "0.0.1"
 authors = ["Ivan Shikhalev <https://bs.shikhalev.org/>"]
 edition = "2018"
 description = "Deduplicate files on local filesystem with hardlinks\nSee https://github.com/shikhalev/dedup"
