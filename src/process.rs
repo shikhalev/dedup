@@ -140,7 +140,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   }
 
   let files_with_dev_and_len_and_crc = match files_with_dev_and_len.get(&crc) {
-      Some(v) => v,
+    Some(v) => v,
     None => {
       logger::error("Unknown error!!!");
       return;
@@ -149,25 +149,33 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   if !files_with_dev_and_len_and_crc.contains_key(&ino) {
     for (_, p) in files_with_dev_and_len_and_crc {
       match file_equal(&p, &path) {
-          Ok(eq) => {
-            if eq {
-              logger::change(format!("{} => {}", path.to_string_lossy().as_ref(), p.to_string_lossy().as_ref()).as_str());
-              //;
-              // TODO: link
-              return;
-            }
+        Ok(eq) => {
+          if eq {
+            logger::change(
+              format!(
+                "{} => {}",
+                path.to_string_lossy().as_ref(),
+                p.to_string_lossy().as_ref()
+              )
+              .as_str(),
+            );
+            //;
+            // TODO: link
+            return;
           }
-          Err(e) => logger::error(&e.to_string()),
+        }
+        Err(e) => logger::error(&e.to_string()),
       }
     }
 
-  let files_with_dev_and_len_and_crc = match files_with_dev_and_len.get_mut(&crc) {
-      Some(v) => v,
-    None => {
-      logger::error("Unknown error!!!");
-      return;
-    }
-  };
+    let files_with_dev_and_len_and_crc =
+      match files_with_dev_and_len.get_mut(&crc) {
+        Some(v) => v,
+        None => {
+          logger::error("Unknown error!!!");
+          return;
+        }
+      };
     files_with_dev_and_len_and_crc.insert(ino, path.clone());
   }
 }
