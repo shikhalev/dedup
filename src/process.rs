@@ -48,7 +48,7 @@ lazy_static! {
 
 fn file_crc64(path: &PathBuf) -> io::Result<u64> {
   let mut file = fs::File::open(&path)?;
-  let mut buffer = Vec::<u8>::with_capacity(OPTS.buffer_size);
+  let mut buffer = vec![0; OPTS.buffer_size];
   let mut digest = Digest::new();
   loop {
     let l = file.read(&mut buffer)?;
@@ -63,8 +63,8 @@ fn file_crc64(path: &PathBuf) -> io::Result<u64> {
 fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
   let mut f1 = fs::File::open(&first_path)?;
   let mut f2 = fs::File::open(&second_path)?;
-  let mut b1 = Vec::<u8>::with_capacity(OPTS.buffer_size);
-  let mut b2 = Vec::<u8>::with_capacity(OPTS.buffer_size);
+  let mut b1 = vec![0; OPTS.buffer_size];
+  let mut b2 = vec![0; OPTS.buffer_size];
   loop {
     let l1 = f1.read(&mut b1)?;
     let l2 = f2.read(&mut b2)?;
@@ -97,6 +97,11 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   }
 
   let len = md.len();
+  if (len as usize) < OPTS.ignore_less {
+    // TODO: message about skip
+    return;
+  }
+
   let crc = match file_crc64(&path) {
     Ok(r) => r,
     Err(e) => {
