@@ -78,6 +78,22 @@ fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
   Ok(true)
 }
 
+fn make_link(path: &PathBuf, target: &PathBuf) {
+  logger::change(
+    format!(
+      "{} => {}",
+      path.to_string_lossy().as_ref(),
+      target.to_string_lossy().as_ref()
+    )
+    .as_str(),
+  );
+  todo!();
+  // TODO:
+  //  создать hardlink в новом файле
+  //  перенести владельца, права, xattr и acl если есть
+  //  удалить старый файл и переименовать hardlink
+}
+
 fn process_file(path: &PathBuf, md: &fs::Metadata) {
   logger::file(&path.to_string_lossy());
 
@@ -156,16 +172,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
       match file_equal(&p, &path) {
         Ok(eq) => {
           if eq {
-            logger::change(
-              format!(
-                "{} => {}",
-                path.to_string_lossy().as_ref(),
-                p.to_string_lossy().as_ref()
-              )
-              .as_str(),
-            );
-            //;
-            // TODO: link
+            make_link(&path, &p);
             return;
           }
         }
