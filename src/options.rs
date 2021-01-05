@@ -3,8 +3,6 @@ use std::os::linux::fs::MetadataExt;
 use std::{path::PathBuf, str::FromStr};
 use termcolor::ColorChoice;
 
-use crate::echo::{echo, Level};
-
 #[derive(Clone, Copy, Clap, Debug, PartialEq)]
 pub enum Verbose {
   All,
@@ -243,7 +241,7 @@ impl Opts {
           Ok(md) => Some(md.st_dev()),
           Err(_) => {
             // TODO: Более подробную ошибку
-            echo(Level::Error, "Invalid primary FS path!");
+            eprintln!("Invalid primary FS path! = {:#?}", path);
             None
           }
         },

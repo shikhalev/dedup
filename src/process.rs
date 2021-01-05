@@ -1,5 +1,4 @@
 use crate::{
-  logger,
   options::{ExternalFSMode, SymlinkMode, OPTS},
 };
 use clap::lazy_static::lazy_static;
@@ -14,17 +13,17 @@ use std::{
 };
 
 fn process_dir(path: &PathBuf) {
-  logger::file(&path.to_string_lossy());
+  dbg!(&path);
   match fs::read_dir(path) {
     Ok(rd) => {
       for entry in rd {
         match entry {
           Ok(en) => process_path(&en.path()),
-          Err(e) => logger::error(&e.to_string()),
+          Err(e) => eprintln!("{:#?}", e),
         }
       }
     }
-    Err(e) => logger::error(&e.to_string()),
+    Err(e) => eprintln!("{:#?}", e),
   }
 }
 
@@ -79,14 +78,7 @@ fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
 }
 
 fn make_link(path: &PathBuf, target: &PathBuf) {
-  logger::change(
-    format!(
-      "{} => {}",
-      path.to_string_lossy().as_ref(),
-      target.to_string_lossy().as_ref()
-    )
-    .as_str(),
-  );
+  dbg!(&path, &target);
   todo!();
   // TODO:
   //  создать hardlink в новом файле
@@ -95,7 +87,7 @@ fn make_link(path: &PathBuf, target: &PathBuf) {
 }
 
 fn process_file(path: &PathBuf, md: &fs::Metadata) {
-  logger::file(&path.to_string_lossy());
+  dbg!(&path, &md);
 
   let dev = md.st_dev();
   let efs_m = OPTS.on_external_fs;
@@ -106,7 +98,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   } else {
     if !OPTS.check_dev(dev) {
       if efs_m == ExternalFSMode::Error {
-        logger::error("Invalid FS!");
+        eprintln!("External!");
       }
       return;
     }
@@ -121,7 +113,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   let crc = match file_crc64(&path) {
     Ok(r) => r,
     Err(e) => {
-      logger::error(&e.to_string());
+      eprintln!("{:#?}", e);
       return;
     }
   };
@@ -130,7 +122,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   let mut all_files = match FILES.lock() {
     Ok(v) => v,
     Err(e) => {
-      logger::error(&e.to_string());
+      eprintln!("{:#?}", e);
       return;
     }
   };
@@ -141,7 +133,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   let files_with_dev = match all_files.get_mut(&dev) {
     Some(v) => v,
     None => {
-      logger::error("Unknown error!!!");
+      eprintln!("Unknown error!!!");
       return;
     }
   };
@@ -152,7 +144,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   let files_with_dev_and_len = match files_with_dev.get_mut(&len) {
     Some(v) => v,
     None => {
-      logger::error("Unknown error!!!");
+      eprintln!("Unknown error!!!");
       return;
     }
   };
@@ -163,7 +155,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   let files_with_dev_and_len_and_crc = match files_with_dev_and_len.get(&crc) {
     Some(v) => v,
     None => {
-      logger::error("Unknown error!!!");
+      eprintln!("Unknown error!!!");
       return;
     }
   };
@@ -176,7 +168,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
             return;
           }
         }
-        Err(e) => logger::error(&e.to_string()),
+        Err(e) => eprintln!("{:#?}", e)
       }
     }
 
@@ -184,7 +176,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
       match files_with_dev_and_len.get_mut(&crc) {
         Some(v) => v,
         None => {
-          logger::error("Unknown error!!!");
+          eprintln!("Unknown error!!!");
           return;
         }
       };
@@ -194,12 +186,12 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
 
 // TODO: Красиво логировать skip, dir и вообще...
 fn process_symlink(path: &PathBuf) {
-  logger::file(&path.to_string_lossy());
+  dbg!(&path);
   match OPTS.on_symlink {
     SymlinkMode::Ignore => {}
     SymlinkMode::Follow => match fs::read_link(&path) {
       Ok(p) => process_path(&p),
-      Err(e) => logger::error(&e.to_string()),
+      Err(e) => eprintln!("{:#?}", e)
     },
     SymlinkMode::Process => todo!(),
   }
@@ -219,6 +211,6 @@ pub fn process_path(path: &PathBuf) {
         todo!(); // TODO: show error
       }
     }
-    Err(e) => logger::error(&e.to_string()),
+    Err(e) => eprintln!("{:#?}", e)
   }
 }
