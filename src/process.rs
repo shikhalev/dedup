@@ -71,7 +71,7 @@ fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
     if l1 == 0 && l2 == 0 {
       break;
     }
-    if l1 != l2 || b1 != b2 {
+    if l1 != l2 || &b1[0..l1] != &b2[0..l2] {
       return Ok(false);
     }
   }
@@ -215,6 +215,8 @@ pub fn process_path(path: &PathBuf) {
         process_dir(&path);
       } else if ft.is_file() {
         process_file(&path, &md);
+      } else {
+        todo!(); // TODO: show error
       }
     }
     Err(e) => logger::error(&e.to_string()),
