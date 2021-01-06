@@ -14,10 +14,11 @@ homepage = "https://github.com/shikhalev/dedup"
 [dependencies]
 clap = { git = "https://github.com/clap-rs/clap/", features = ["color", "derive"] }
 byte-unit = "*"
-termcolor = "*"
+# termcolor = "*"
 shellexpand = "*"
 chrono = "*"
 crc64fast = "*"
+libc = "*"
 
 [profile.release]
 opt-level = 3

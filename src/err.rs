@@ -1,5 +1,9 @@
 use std::{
-  convert::Infallible, env::VarError, error, ffi::OsString, fmt, io, result,
+  convert::Infallible,
+  env::VarError,
+  error,
+  ffi::{NulError, OsString},
+  fmt, io, result,
 };
 
 use shellexpand::LookupError;
@@ -9,6 +13,8 @@ pub enum Error {
   IOError(io::Error),
   ExpandError(LookupError<VarError>),
   UnicodeError { lossy: String },
+  NulError(NulError),
+  Unspecified(String),
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -39,6 +45,12 @@ impl From<OsString> for Error {
   }
 }
 
+impl From<NulError> for Error {
+  fn from(src: NulError) -> Self {
+    Self::NulError(src)
+  }
+}
+
 impl fmt::Display for Error {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match &self {
@@ -47,6 +59,8 @@ impl fmt::Display for Error {
       Error::UnicodeError { lossy } => {
         write!(f, "Unicode Error: lossy string = {:?}", lossy)
       }
+      Error::NulError(e) => write!(f, "NulError: {}", e),
+      Error::Unspecified(s) => write!(f, "Unspecified Error: {}", s),
     }
   }
 }
@@ -56,6 +70,7 @@ impl error::Error for Error {
     match &self {
       Error::IOError(e) => Some(e),
       Error::ExpandError(e) => Some(e),
+      Error::NulError(e) => Some(e),
       _ => None,
     }
   }

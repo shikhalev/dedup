@@ -1,9 +1,10 @@
 use crate::{
+  err::{Error, Result},
   options::{ExternalFSMode, SymlinkMode, OPTS},
 };
 use clap::lazy_static::lazy_static;
 use crc64fast::Digest;
-use std::os::linux::fs::MetadataExt;
+use std::os::unix::ffi::OsStrExt;
 use std::{
   collections::HashMap,
   fs,
@@ -11,9 +12,10 @@ use std::{
   path::PathBuf,
   sync::Mutex,
 };
+use std::{ffi::CString, os::linux::fs::MetadataExt, str::FromStr};
 
 fn process_dir(path: &PathBuf) {
-  dbg!(&path);
+  eprintln!("process_dir = {:?}", &path);
   match fs::read_dir(path) {
     Ok(rd) => {
       for entry in rd {
@@ -77,17 +79,87 @@ fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
   Ok(true)
 }
 
+fn temp_name(path: &PathBuf) -> crate::err::Result<PathBuf> {
+  //let str_path = path.to_str();
+  match path.to_str() {
+    Some(s) => {
+      let mut i = 0;
+      let mut result = PathBuf::from_str(&format!("{}_{}", s, i))?;
+      while result.exists() {
+        i += 1;
+        result = PathBuf::from_str(&format!("{}_{}", s, i))?;
+      }
+      eprintln!("temp_name = {:?} [{:?}]", &result, &path);
+      Ok(result)
+    }
+    None => Err(Error::UnicodeError {
+      lossy: path.to_string_lossy().to_string(),
+    }),
+  }
+}
+
+fn make_temp(path: &PathBuf, target: &PathBuf) -> crate::err::Result<PathBuf> {
+  let new_name = temp_name(path)?;
+  fs::hard_link(target, &new_name)?;
+  Ok(new_name)
+}
+
+fn copy_permissions(from: &PathBuf, to: &PathBuf) -> Result<()> {
+  fs::set_permissions(to, from.metadata()?.permissions())?;
+  Ok(())
+}
+
+fn copy_owner(from: &PathBuf, to: &PathBuf) -> Result<()> {
+  let c_name = CString::new(to.as_os_str().as_bytes())?;
+  let md = from.metadata()?;
+  if unsafe { libc::chown(c_name.as_ptr(), md.st_uid(), md.st_gid()) } == 0 {
+    Ok(())
+  } else {
+    Err(Error::Unspecified("Error in libc::chown".to_string()))
+  }
+}
+
+fn move_temp(path: &PathBuf, temp: &PathBuf) -> Result<()> {
+  fs::remove_file(path)?;
+  fs::rename(temp, path)?;
+  Ok(())
+}
+
 fn make_link(path: &PathBuf, target: &PathBuf) {
-  dbg!(&path, &target);
-  todo!();
-  // TODO:
-  //  создать hardlink в новом файле
-  //  перенести владельца, права, xattr и acl если есть
-  //  удалить старый файл и переименовать hardlink
+  eprintln!("make_link = {:?} => {:?}", &path, &target);
+  if OPTS.scan_only {
+    eprintln!("scan_only");
+    return;
+  }
+  match make_temp(path, target) {
+    Ok(temp) => {
+      match copy_permissions(path, &temp) {
+        Ok(_) => {}
+        Err(e) => eprintln!("{:#?}", e),
+      }
+      match copy_owner(path, &temp) {
+        Ok(_) => {}
+        Err(e) => eprintln!("{:#?}", e),
+      }
+      // TODO: xattr & ACL
+
+      match move_temp(path, &temp) {
+          Ok(_) => eprintln!("done"),
+          Err(e) => {
+            eprintln!("{:#?}", e);
+            match fs::remove_file(&temp) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{:#?}", e)
+            }
+          }
+      }
+    }
+    Err(e) => eprintln!("{:#?}", e),
+  }
 }
 
 fn process_file(path: &PathBuf, md: &fs::Metadata) {
-  dbg!(&path, &md);
+  eprintln!("process_file = {:?} [ino = {}]", &path, &md.st_ino());
 
   let dev = md.st_dev();
   let efs_m = OPTS.on_external_fs;
@@ -168,7 +240,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
             return;
           }
         }
-        Err(e) => eprintln!("{:#?}", e)
+        Err(e) => eprintln!("{:#?}", e),
       }
     }
 
@@ -186,12 +258,12 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
 
 // TODO: Красиво логировать skip, dir и вообще...
 fn process_symlink(path: &PathBuf) {
-  dbg!(&path);
+  eprintln!("process_symlink = {:?}", &path);
   match OPTS.on_symlink {
     SymlinkMode::Ignore => {}
     SymlinkMode::Follow => match fs::read_link(&path) {
       Ok(p) => process_path(&p),
-      Err(e) => eprintln!("{:#?}", e)
+      Err(e) => eprintln!("{:#?}", e),
     },
     SymlinkMode::Process => todo!(),
   }
@@ -211,6 +283,6 @@ pub fn process_path(path: &PathBuf) {
         todo!(); // TODO: show error
       }
     }
-    Err(e) => eprintln!("{:#?}", e)
+    Err(e) => eprintln!("{:#?}", e),
   }
 }

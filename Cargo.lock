@@ -147,8 +147,8 @@ dependencies = [
  "chrono",
  "clap",
  "crc64fast",
+ "libc",
  "shellexpand",
- "termcolor",
 ]
 
 [[package]]

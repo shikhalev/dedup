@@ -1,36 +1,36 @@
 use clap::{lazy_static::lazy_static, AppSettings, Clap, ValueHint};
 use std::os::linux::fs::MetadataExt;
 use std::{path::PathBuf, str::FromStr};
-use termcolor::ColorChoice;
+// use termcolor::ColorChoice;
 
-#[derive(Clone, Copy, Clap, Debug, PartialEq)]
-pub enum Verbose {
-  All,
-  Actions,
-  Errors,
-  None,
-}
+// #[derive(Clone, Copy, Clap, Debug, PartialEq)]
+// pub enum Verbose {
+//   All,
+//   Actions,
+//   Errors,
+//   None,
+// }
 
-#[derive(Clone, Copy, Clap, Debug, PartialEq)]
-pub enum ColorMode {
-  Always,
-  #[clap(visible_alias = "ansi")]
-  AlwaysAnsi,
-  #[clap(visible_alias = "default")]
-  Auto,
-  Never,
-}
+// #[derive(Clone, Copy, Clap, Debug, PartialEq)]
+// pub enum ColorMode {
+//   Always,
+//   #[clap(visible_alias = "ansi")]
+//   AlwaysAnsi,
+//   #[clap(visible_alias = "default")]
+//   Auto,
+//   Never,
+// }
 
-impl Into<ColorChoice> for ColorMode {
-  fn into(self) -> ColorChoice {
-    match self {
-      ColorMode::Always => ColorChoice::Always,
-      ColorMode::AlwaysAnsi => ColorChoice::AlwaysAnsi,
-      ColorMode::Auto => ColorChoice::Auto,
-      ColorMode::Never => ColorChoice::Never,
-    }
-  }
-}
+// impl Into<ColorChoice> for ColorMode {
+//   fn into(self) -> ColorChoice {
+//     match self {
+//       ColorMode::Always => ColorChoice::Always,
+//       ColorMode::AlwaysAnsi => ColorChoice::AlwaysAnsi,
+//       ColorMode::Auto => ColorChoice::Auto,
+//       ColorMode::Never => ColorChoice::Never,
+//     }
+//   }
+// }
 
 #[derive(Clone, Copy, Clap, Debug, PartialEq)]
 pub enum SymlinkMode {
@@ -63,15 +63,14 @@ fn parse_bytes(src: &str) -> usize {
 #[derive(Clap, Debug)]
 #[clap(version, author, about, setting = AppSettings::ColoredHelp, setting = AppSettings::UnifiedHelpMessage)]
 pub struct Opts {
-  #[clap(
-    short,
-    long = "color",
-    arg_enum,
-    default_value = "auto",
-    value_name = "mode"
-  )]
-  pub color_mode: ColorMode,
-
+  // #[clap(
+  //   short,
+  //   long = "color",
+  //   arg_enum,
+  //   default_value = "auto",
+  //   value_name = "mode"
+  // )]
+  // pub color_mode: ColorMode,
   /// What do (or not) when error occurred.
   ///
   /// `warning` - print message on `stderr`;
@@ -160,33 +159,32 @@ pub struct Opts {
   #[clap(short, long, parse(from_str = parse_bytes), default_value = "1MiB", value_name = "size")]
   pub buffer_size: usize,
 
-  /// Verbose level.
-  ///
-  /// `all` - show all checked files;
-  /// `actions` - show changes;
-  /// `errors` - show error warnings only;
-  /// `none` - full silence mode.
-  #[clap(
-    short,
-    long,
-    arg_enum,
-    default_value = "actions",
-    value_name = "mode"
-  )]
-  pub verbose: Verbose,
+  // /// Verbose level.
+  // ///
+  // /// `all` - show all checked files;
+  // /// `actions` - show changes;
+  // /// `errors` - show error warnings only;
+  // /// `none` - full silence mode.
+  // #[clap(
+  //   short,
+  //   long,
+  //   arg_enum,
+  //   default_value = "actions",
+  //   value_name = "mode"
+  // )]
+  // pub verbose: Verbose,
 
-  /// Write log file.
-  ///
-  /// If file name is not specified, write to `./dedup.log`
-  #[clap(short, long, value_hint = ValueHint::FilePath, value_name = "file")]
-  pub log: Option<Option<PathBuf>>,
+  // /// Write log file.
+  // ///
+  // /// If file name is not specified, write to `./dedup.log`
+  // #[clap(short, long, value_hint = ValueHint::FilePath, value_name = "file")]
+  // pub log: Option<Option<PathBuf>>,
 
-  /// What will written to log.
-  ///
-  /// See `--verbose` for details.
-  #[clap(long, arg_enum, default_value = "actions", value_name = "mode")]
-  pub log_verbose: Verbose,
-
+  // /// What will written to log.
+  // ///
+  // /// See `--verbose` for details.
+  // #[clap(long, arg_enum, default_value = "actions", value_name = "mode")]
+  // pub log_verbose: Verbose,
   /// Exclude some names or paths from processing.
   #[clap(
     short = 'X',
@@ -217,19 +215,19 @@ lazy_static! {
 }
 
 impl Opts {
-  pub fn log_needed(&self) -> bool {
-    self.log.is_some() && self.log_verbose != Verbose::None
-  }
+  // pub fn log_needed(&self) -> bool {
+  //   self.log.is_some() && self.log_verbose != Verbose::None
+  // }
 
-  pub fn log_path(&self) -> &PathBuf {
-    match &self.log {
-      Some(opt) => match &opt {
-        Some(path) => path,
-        None => &*DEFAULT_LOG_PATH,
-      },
-      None => &*DEFAULT_LOG_PATH,
-    }
-  }
+  // pub fn log_path(&self) -> &PathBuf {
+  //   match &self.log {
+  //     Some(opt) => match &opt {
+  //       Some(path) => path,
+  //       None => &*DEFAULT_LOG_PATH,
+  //     },
+  //     None => &*DEFAULT_LOG_PATH,
+  //   }
+  // }
 
   pub fn calculate() -> Self {
     let mut result = Self::parse();
