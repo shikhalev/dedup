@@ -262,7 +262,9 @@ fn process_symlink(path: &PathBuf) {
   match OPTS.on_symlink {
     SymlinkMode::Ignore => {}
     SymlinkMode::Follow => match fs::read_link(&path) {
-      Ok(p) => process_path(&p),
+      Ok(p) => {
+        eprintln!("{:?} => {:?}", &path, &p);
+        process_path(&p)},
       Err(e) => eprintln!("{:#?}", e),
     },
     SymlinkMode::Process => todo!(),
@@ -270,7 +272,7 @@ fn process_symlink(path: &PathBuf) {
 }
 
 pub fn process_path(path: &PathBuf) {
-  match path.metadata() {
+  match path.symlink_metadata() {
     Ok(md) => {
       let ft = md.file_type();
       if ft.is_symlink() {
