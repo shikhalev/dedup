@@ -36,7 +36,7 @@ use std::{path::PathBuf, str::FromStr};
 pub enum SymlinkMode {
   Ignore,
   Follow,
-  Process,
+  // Process,     TODO: implement
 }
 
 #[derive(Clone, Copy, Clap, Debug, PartialEq)]
@@ -97,7 +97,6 @@ pub struct Opts {
   ///
   /// `ignore` - skip symlinks;
   /// `follow` - check symlink target (include directories);
-  /// `process` - process a symlink as regular file.
   #[clap(
     short = 'y',
     long,
@@ -107,9 +106,9 @@ pub struct Opts {
   )]
   pub on_symlink: SymlinkMode,
 
-  /// Use symlinks instead hardlinks. Dangerous option!
-  #[clap(short = 'Y', long)]
-  pub use_symlinks: bool,
+  // /// Use symlinks instead hardlinks. Dangerous option!
+  // #[clap(short = 'Y', long)]
+  // pub use_symlinks: bool,
 
   /// What do (or not) if some files are in different filesystems.
   ///

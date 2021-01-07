@@ -1,18 +1,12 @@
-use crate::{
-  err::{Error, Result},
-  options::{ExternalFSMode, SymlinkMode, OPTS},
-};
+use crate::{err::Result, options::{ExternalFSMode, SymlinkMode, OPTS}, file};
 use clap::lazy_static::lazy_static;
-use crc64fast::Digest;
-use std::os::unix::ffi::OsStrExt;
 use std::{
   collections::HashMap,
   fs,
-  io::{self, Read},
   path::PathBuf,
   sync::Mutex,
 };
-use std::{ffi::CString, os::linux::fs::MetadataExt, str::FromStr};
+use std::os::linux::fs::MetadataExt;
 
 fn process_dir(path: &PathBuf) {
   eprintln!("process_dir = {:?}", &path);
@@ -47,82 +41,10 @@ lazy_static! {
   static ref FILES: Mutex<Files> = Mutex::new(Files::new());
 }
 
-fn file_crc64(path: &PathBuf) -> io::Result<u64> {
-  let mut file = fs::File::open(&path)?;
-  let mut buffer = vec![0; OPTS.buffer_size];
-  let mut digest = Digest::new();
-  loop {
-    let l = file.read(&mut buffer)?;
-    if l == 0 {
-      break;
-    }
-    digest.write(&buffer);
-  }
-  Ok(digest.sum64())
-}
-
-fn file_equal(first_path: &PathBuf, second_path: &PathBuf) -> io::Result<bool> {
-  let mut f1 = fs::File::open(&first_path)?;
-  let mut f2 = fs::File::open(&second_path)?;
-  let mut b1 = vec![0; OPTS.buffer_size];
-  let mut b2 = vec![0; OPTS.buffer_size];
-  loop {
-    let l1 = f1.read(&mut b1)?;
-    let l2 = f2.read(&mut b2)?;
-    if l1 == 0 && l2 == 0 {
-      break;
-    }
-    if l1 != l2 || &b1[0..l1] != &b2[0..l2] {
-      return Ok(false);
-    }
-  }
-  Ok(true)
-}
-
-fn temp_name(path: &PathBuf) -> crate::err::Result<PathBuf> {
-  //let str_path = path.to_str();
-  match path.to_str() {
-    Some(s) => {
-      let mut i = 0;
-      let mut result = PathBuf::from_str(&format!("{}_{}", s, i))?;
-      while result.exists() {
-        i += 1;
-        result = PathBuf::from_str(&format!("{}_{}", s, i))?;
-      }
-      eprintln!("temp_name = {:?} [{:?}]", &result, &path);
-      Ok(result)
-    }
-    None => Err(Error::UnicodeError {
-      lossy: path.to_string_lossy().to_string(),
-    }),
-  }
-}
-
-fn make_temp(path: &PathBuf, target: &PathBuf) -> crate::err::Result<PathBuf> {
-  let new_name = temp_name(path)?;
+fn make_temp_hardlink(path: &PathBuf, target: &PathBuf) -> Result<PathBuf> {
+  let new_name = file::temp_name(path)?;
   fs::hard_link(target, &new_name)?;
   Ok(new_name)
-}
-
-fn copy_permissions(from: &PathBuf, to: &PathBuf) -> Result<()> {
-  fs::set_permissions(to, from.metadata()?.permissions())?;
-  Ok(())
-}
-
-fn copy_owner(from: &PathBuf, to: &PathBuf) -> Result<()> {
-  let c_name = CString::new(to.as_os_str().as_bytes())?;
-  let md = from.metadata()?;
-  if unsafe { libc::chown(c_name.as_ptr(), md.st_uid(), md.st_gid()) } == 0 {
-    Ok(())
-  } else {
-    Err(Error::Unspecified("Error in libc::chown".to_string()))
-  }
-}
-
-fn move_temp(path: &PathBuf, temp: &PathBuf) -> Result<()> {
-  fs::remove_file(path)?;
-  fs::rename(temp, path)?;
-  Ok(())
 }
 
 fn make_link(path: &PathBuf, target: &PathBuf) {
@@ -131,19 +53,19 @@ fn make_link(path: &PathBuf, target: &PathBuf) {
     eprintln!("scan_only");
     return;
   }
-  match make_temp(path, target) {
+  match make_temp_hardlink(path, target) {
     Ok(temp) => {
-      match copy_permissions(path, &temp) {
+      match file::copy_permissions(path, &temp) {
         Ok(_) => {}
         Err(e) => eprintln!("{:#?}", e),
       }
-      match copy_owner(path, &temp) {
+      match file::copy_owner(path, &temp) {
         Ok(_) => {}
         Err(e) => eprintln!("{:#?}", e),
       }
       // TODO: xattr & ACL
 
-      match move_temp(path, &temp) {
+      match file::replace(path, &temp) {
           Ok(_) => eprintln!("done"),
           Err(e) => {
             eprintln!("{:#?}", e);
@@ -182,7 +104,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
     return;
   }
 
-  let crc = match file_crc64(&path) {
+  let crc = match file::crc64(&path, OPTS.buffer_size) {
     Ok(r) => r,
     Err(e) => {
       eprintln!("{:#?}", e);
@@ -233,7 +155,7 @@ fn process_file(path: &PathBuf, md: &fs::Metadata) {
   };
   if !files_with_dev_and_len_and_crc.contains_key(&ino) {
     for (_, p) in files_with_dev_and_len_and_crc {
-      match file_equal(&p, &path) {
+      match file::compare_content(&p, &path, OPTS.buffer_size) {
         Ok(eq) => {
           if eq {
             make_link(&path, &p);
@@ -261,13 +183,12 @@ fn process_symlink(path: &PathBuf) {
   eprintln!("process_symlink = {:?}", &path);
   match OPTS.on_symlink {
     SymlinkMode::Ignore => {}
-    SymlinkMode::Follow => match fs::read_link(&path) {
+    SymlinkMode::Follow => match fs::canonicalize(&path) {
       Ok(p) => {
         eprintln!("{:?} => {:?}", &path, &p);
         process_path(&p)},
       Err(e) => eprintln!("{:#?}", e),
     },
-    SymlinkMode::Process => todo!(),
   }
 }
 
