@@ -3,7 +3,6 @@ use std::{ffi::CString, fs, io::{self, Read}, os::{linux::fs::MetadataExt, unix:
 use crc64fast::Digest;
 use shellexpand;
 
-// TODO: Убрать лишнее преобразование OsStr -> str -> OsStr
 pub fn expand_path(src: &PathBuf) -> Result<PathBuf> {
   match src.to_str() {
     Some(s) => Ok(PathBuf::from_str(&shellexpand::full(s)?)?.canonicalize()?),
@@ -27,7 +26,7 @@ pub fn crc64(path: &PathBuf, buffer_size: usize) -> io::Result<u64> {
   Ok(digest.sum64())
 }
 
-pub fn compare_content(first_path: &PathBuf, second_path: &PathBuf, buffer_size: usize) -> io::Result<bool> {
+pub fn compare_content(first_path: &PathBuf, second_path: &PathBuf, buffer_size: usize) -> Result<bool> {
   let mut f1 = fs::File::open(&first_path)?;
   let mut f2 = fs::File::open(&second_path)?;
   let mut b1 = vec![0; buffer_size];

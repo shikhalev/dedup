@@ -63,8 +63,6 @@ fn make_link(path: &PathBuf, target: &PathBuf) {
         Ok(_) => {}
         Err(e) => eprintln!("{:#?}", e),
       }
-      // TODO: xattr & ACL
-
       match file::replace(path, &temp) {
           Ok(_) => eprintln!("done"),
           Err(e) => {
