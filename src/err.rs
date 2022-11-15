@@ -27,7 +27,7 @@ impl From<io::Error> for Error {
 
 impl From<Infallible> for Error {
   fn from(src: Infallible) -> Self {
-    panic!(format!("{:#?}", src))
+    panic!("{:#?}", src)
   }
 }
 
